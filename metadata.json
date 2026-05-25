@@ -1,0 +1,10 @@
+{
+  "name": "සිරිල් - AI Business Consultant",
+  "description": "An AI-powered business consulting assistant that helps you transition from a raw idea to a market-ready status, featuring real-time viability scoring, roadmap planning, and issue tracking.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
