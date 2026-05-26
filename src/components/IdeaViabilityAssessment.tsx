@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { ViabilityDetails, BusinessReport } from "../types";
 import { Sparkles, TrendingUp, Compass, Activity, BrainCircuit } from "lucide-react";
 import { motion } from "motion/react";
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from "recharts";
 
 interface IdeaViabilityAssessmentProps {
   report: BusinessReport;
@@ -66,6 +67,12 @@ export const IdeaViabilityAssessment: React.FC<IdeaViabilityAssessmentProps> = (
 
   const overallRating = getOverallLabel(calculatedOverallScore);
 
+  const chartData = [
+    { subject: 'Market Fit', score: marketFitVal, fullMark: 100 },
+    { subject: 'Execution', score: executionVal, fullMark: 100 },
+    { subject: 'Scalability', score: scaleVal, fullMark: 100 },
+  ];
+
   return (
     <div className="flex flex-col gap-6 p-5 rounded-xl bg-cyber-card/80 border border-cyber-bright/35 h-full">
       {/* Section Title */}
@@ -82,43 +89,34 @@ export const IdeaViabilityAssessment: React.FC<IdeaViabilityAssessmentProps> = (
       </div>
 
       {/* Main Overall Meter Indicator */}
-      <div className="flex flex-col md:flex-row items-center gap-6 p-5 rounded-xl bg-black/40 border border-cyber-bright/30">
-        <div className="relative w-32 h-32 flex items-center justify-center shrink-0">
-          <svg className="w-full h-full transform -rotate-90">
-            <circle
-              cx="64"
-              cy="64"
-              r="52"
-              fill="transparent"
-              stroke="#1f222a"
-              strokeWidth="10"
-            />
-            <motion.circle
-              cx="64"
-              cy="64"
-              r="52"
-              fill="transparent"
-              stroke="#00ff9d"
-              strokeWidth="10"
-              strokeDasharray={`${2 * Math.PI * 52}`}
-              animate={{ strokeDashoffset: `${2 * Math.PI * 52 * (1 - calculatedOverallScore / 100)}` }}
-              transition={{ duration: 0.6 }}
-              strokeLinecap="round"
-              className="drop-shadow-[0_0_8px_#00ff9d]"
-            />
-          </svg>
-          <div className="absolute text-center">
-            <span className="text-3xl font-display font-bold text-white block">
+      <div className="flex items-center gap-6 p-5 rounded-xl bg-black/40 border border-cyber-bright/30">
+        <div className="relative w-36 h-36 flex items-center justify-center shrink-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <RadarChart cx="50%" cy="50%" outerRadius="65%" data={chartData}>
+              <PolarGrid stroke="#1f222a" />
+              <PolarAngleAxis dataKey="subject" tick={{ fill: '#cbd5e1', fontSize: 9, fontFamily: 'var(--font-mono)' }} />
+              <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
+              <Radar
+                name="Viability"
+                dataKey="score"
+                stroke="#00ff9d"
+                fill="#00ff9d"
+                fillOpacity={0.25}
+              />
+            </RadarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="flex-1 flex flex-col justify-center">
+          <div className="flex items-end gap-2 mb-1">
+            <span className="text-4xl font-display font-bold text-white leading-none">
               {calculatedOverallScore}
             </span>
-            <span className="text-[9px] font-label uppercase text-cyber-muted tracking-widest mt-0.5 block">
+            <span className="text-[10px] font-label uppercase text-cyber-muted tracking-widest pb-1">
               Viability Score
             </span>
           </div>
-        </div>
-
-        <div className="flex-1 text-center md:text-left">
-          <span className="text-[10px] font-mono font-semibold tracking-wider text-cyber-tertiary block">
+          <span className="text-[10px] font-mono font-semibold tracking-wider text-cyber-tertiary block mt-2">
             {overallRating.status}
           </span>
           <p className="text-sm font-display text-white font-medium mt-1">

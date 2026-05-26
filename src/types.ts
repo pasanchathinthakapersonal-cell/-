@@ -40,6 +40,14 @@ export interface Milestone {
   targetDate: string;
 }
 
+export interface WorkspaceThread {
+  id: string;
+  title: string;
+  messages: Message[];
+  report: BusinessReport | null;
+  updatedAt: string;
+}
+
 export interface BusinessReport {
   businessName: string;
   category: string;

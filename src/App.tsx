@@ -6,7 +6,8 @@ import { ImplementationRoadmap } from "./components/ImplementationRoadmap";
 import { IssueTracker } from "./components/IssueTracker";
 import { DashboardOverview } from "./components/DashboardOverview";
 import { FooterCredits } from "./components/FooterCredits";
-import { BusinessReport, Message, BusinessIssue, Milestone } from "./types";
+import { ThreadSidebar } from "./components/ThreadSidebar";
+import { WorkspaceThread, BusinessReport, Message, BusinessIssue, Milestone } from "./types";
 import { LayoutDashboard, BrainCircuit, Calendar, ShieldAlert, Sparkles, AlertCircle, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -134,12 +135,25 @@ Let's brainstorm your business concept and compile it into a market-ready struct
 ];
 
 export default function App() {
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
-  const [report, setReport] = useState<BusinessReport>(initialReport);
+  const [threads, setThreads] = useState<WorkspaceThread[]>([
+    {
+      id: "thread_initial",
+      title: "UrbanFlora IoT Systems",
+      messages: initialMessages,
+      report: initialReport,
+      updatedAt: new Date().toISOString()
+    }
+  ]);
+  const [activeThreadId, setActiveThreadId] = useState<string>("thread_initial");
+
   const [activeTab, setActiveTab] = useState<'viability' | 'roadmap' | 'issues'>('viability');
   const [isLoading, setIsLoading] = useState(false);
   const [showFloatingDashboard, setShowFloatingDashboard] = useState(false);
   
+  const activeThread = threads.find(t => t.id === activeThreadId) || threads[0];
+  const messages = activeThread.messages;
+  const report = activeThread.report;
+
   // Custom interactive notifications and error bounds
   const [notice, setNotice] = useState<{ message: string; type: 'info' | 'error' | 'success' } | null>(null);
 
@@ -150,16 +164,18 @@ export default function App() {
 
   // State Updates from nested views
   const handleUpdateMilestone = (milestoneId: string, status: 'completed' | 'in-progress' | 'upcoming') => {
+    if (!report) return;
     const updatedMilestones = report.milestones.map((m) =>
       m.id === milestoneId ? { ...m, status } : m
     );
-    setReport({ ...report, milestones: updatedMilestones });
+    updateActiveThreadReport({ ...report, milestones: updatedMilestones });
     triggerNotification(`Milestone updated to ${status}.`, "success");
   };
 
   const handleUpdateReportScore = (newScores: { marketFit: number; executionContext: number; scalability: number }) => {
+    if (!report) return;
     const overall = Math.round((newScores.marketFit + newScores.executionContext + newScores.scalability) / 3);
-    setReport({
+    updateActiveThreadReport({
       ...report,
       overallScore: overall,
       viabilityDetails: {
@@ -171,18 +187,75 @@ export default function App() {
   };
 
   const handleUpdateIssueStatus = (issueId: string, status: 'Open' | 'In Progress' | 'Resolved') => {
+    if (!report) return;
     const updatedIssues = report.issues.map((i) =>
       i.id === issueId ? { ...i, status } : i
     );
-    setReport({ ...report, issues: updatedIssues });
+    updateActiveThreadReport({ ...report, issues: updatedIssues });
     triggerNotification(`Risk state transitioned to "${status}".`, "success");
   };
 
   const handleAddCustomIssue = (newIssue: Omit<BusinessIssue, 'id'>) => {
+    if (!report) return;
     const id = `idx_${Date.now()}`;
     const issue: BusinessIssue = { ...newIssue, id };
-    setReport({ ...report, issues: [issue, ...report.issues] });
+    updateActiveThreadReport({ ...report, issues: [issue, ...report.issues] });
     triggerNotification(`Custom risk "${newIssue.title}" logged to tracker successfully.`, "success");
+  };
+
+  const updateActiveThreadReport = (newReport: BusinessReport) => {
+    setThreads(prev => prev.map(t => t.id === activeThreadId ? { ...t, report: newReport, updatedAt: new Date().toISOString() } : t));
+  };
+
+  const updateActiveThreadMessages = (newMessages: Message[]) => {
+    setThreads(prev => prev.map(t => t.id === activeThreadId ? { ...t, messages: newMessages, updatedAt: new Date().toISOString() } : t));
+  };
+
+  const handleNewThread = () => {
+    const id = `thread_${Date.now()}`;
+    const newThread: WorkspaceThread = {
+      id,
+      title: "New Brainstorming Session",
+      messages: [{
+        id: `ast_welcome_${Date.now()}`,
+        role: "assistant",
+        content: `සිරිල් online.\n\nLet's brainstorm your new business concept. What raw idea are we exploring today?`,
+        timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+      }],
+      report: null,
+      updatedAt: new Date().toISOString()
+    };
+    setThreads(prev => [newThread, ...prev]);
+    setActiveThreadId(id);
+    triggerNotification("New workspace initialized.", "success");
+  };
+
+  const handleDeleteThread = (id: string) => {
+    setThreads(prev => {
+      const filtered = prev.filter(t => t.id !== id);
+      if (filtered.length === 0) {
+        // Create an empty default
+        const defaultThread = {
+          id: "thread_default",
+          title: "New Session",
+          messages: [{
+            id: `ast_welcome_${Date.now()}`,
+            role: "assistant",
+            content: `Hello. Let's brainstorm your next big idea.`,
+            timestamp: new Date().toLocaleTimeString()
+          }],
+          report: null,
+          updatedAt: new Date().toISOString()
+        };
+        setActiveThreadId(defaultThread.id);
+        return [defaultThread];
+      }
+      if (activeThreadId === id) {
+        setActiveThreadId(filtered[0].id);
+      }
+      return filtered;
+    });
+    triggerNotification("Workspace deleted.", "info");
   };
 
   // Chat Submission Handler (Express API)
@@ -195,14 +268,20 @@ export default function App() {
       timestamp,
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    const newMessages = [...messages, userMsg];
+    updateActiveThreadMessages(newMessages);
     setIsLoading(true);
+
+    // Update title of thread if it's new
+    if (messages.length <= 1) {
+      setThreads(prev => prev.map(t => t.id === activeThreadId ? { ...t, title: text.substring(0, 30) + (text.length > 30 ? "..." : "") } : t));
+    }
 
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [...messages, userMsg] }),
+        body: JSON.stringify({ messages: newMessages }),
       });
 
       if (!response.ok) {
@@ -217,7 +296,7 @@ export default function App() {
         timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
       };
 
-      setMessages((prev) => [...prev, assistantMsg]);
+      updateActiveThreadMessages([...newMessages, assistantMsg]);
     } catch (err: any) {
       console.warn("Express server unconfigured or unavailable. Pivoting to Local Cyril Simulation Engine:", err);
       simulateCyrilResponse(text);
@@ -263,7 +342,7 @@ Let's immediately compile your detailed comprehensive report! Click the **Compil
         timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
       };
 
-      setMessages((prev) => [...prev, assistantMsg]);
+      updateActiveThreadMessages([...messages, { id: `usr_${Date.now()}`, role: "user", content: text, timestamp: new Date().toLocaleTimeString() }, assistantMsg]);
       triggerNotification("Running on local Cyril Simulation engine (Offline fallback).", "info");
     }, 1200);
   };
@@ -289,9 +368,8 @@ Let's immediately compile your detailed comprehensive report! Click the **Compil
       }
 
       const data = await response.json();
-      setReport(data);
+      updateActiveThreadReport(data);
       triggerNotification(`New report successfully compiled for ${data.businessName || "your concept"}!`, "success");
-      // Smoothly focus user on newly built credentials
       setActiveTab('viability');
     } catch (err: any) {
       console.warn("Express report compiler failed. Launching Local high-fidelity simulation engine...", err);
@@ -409,7 +487,7 @@ Let's immediately compile your detailed comprehensive report! Click the **Compil
         ]
       };
 
-      setReport(simulatedReport);
+      updateActiveThreadReport(simulatedReport);
       triggerNotification(`Offline simulator: compiled high-fidelity stats for ${simulatedReport.businessName}!`, "success");
       setIsLoading(false);
       setActiveTab('viability');
@@ -452,43 +530,63 @@ Let's immediately compile your detailed comprehensive report! Click the **Compil
       </div>
 
       {/* Main Workspace Layout (Bento Grid) */}
-      <main className="max-w-[1400px] w-full mx-auto p-4 md:p-6 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+      <main className="max-w-[1500px] w-full mx-auto p-4 md:p-6 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         
-        {/* Left Side: Conversational Brainstorming */}
-        <section className="lg:col-span-6 xl:col-span-7 h-[760px] flex flex-col" id="brainstorm-workspace">
+        {/* Left Side: Thread Management Sidebar */}
+        <section className="lg:col-span-3 h-[760px] flex flex-col hidden lg:flex" id="threads-sidebar">
+          <ThreadSidebar 
+            threads={threads}
+            activeThreadId={activeThreadId}
+            onSelectThread={setActiveThreadId}
+            onNewThread={handleNewThread}
+            onDeleteThread={handleDeleteThread}
+          />
+        </section>
+
+        {/* Center: Conversational Brainstorming */}
+        <section className="lg:col-span-5 h-[760px] flex flex-col" id="brainstorm-workspace">
           <ConversationalWorkspace
             messages={messages}
             onSendMessage={handleSendMessage}
             isLoading={isLoading}
             onGenerateReport={handleGenerateReport}
-            hasReport={true}
+            hasReport={!!report}
           />
         </section>
 
         {/* Right Side: Interactive Reports & Diagnostics (Bento Grid Panels) */}
-        <section className="lg:col-span-6 xl:col-span-5 flex flex-col gap-5 h-[760px] overflow-y-auto pb-6 scrollbar-thin pr-1" id="report-workspace">
-          
-          {/* Bento Card 1: Viability Assessment */}
-          <div className="bg-[#0f1116] rounded-2xl border border-white/5 shadow-2xl overflow-hidden transition-all duration-300 hover:border-cyber-primary/25">
-            <IdeaViabilityAssessment
-              report={report}
-              onUpdateReportScore={handleUpdateReportScore}
-            />
-          </div>
+        <section className="lg:col-span-4 flex flex-col gap-5 h-[760px] overflow-y-auto pb-6 scrollbar-thin pr-1" id="report-workspace">
+          {!report ? (
+             <div className="flex-1 flex flex-col items-center justify-center bg-cyber-card/30 border border-cyber-bright/35 rounded-2xl p-8 text-center">
+               <Sparkles className="w-12 h-12 text-cyber-muted opacity-50 mb-3" />
+               <h3 className="text-lg font-display text-white mb-2">No Report Available</h3>
+               <p className="text-sm text-cyber-muted">Provide a business concept in the brainstorming workspace, then generate a full architectural report.</p>
+             </div>
+          ) : (
+            <>
+              {/* Bento Card 1: Viability Assessment */}
+              <div className="bg-[#0f1116] rounded-2xl border border-white/5 shadow-2xl overflow-hidden transition-all duration-300 hover:border-cyber-primary/25">
+                <IdeaViabilityAssessment
+                  report={report}
+                  onUpdateReportScore={handleUpdateReportScore}
+                />
+              </div>
 
-          {/* Bento Card 2: Implementation Roadmap */}
-          <div className="bg-[#0f1116] rounded-2xl border border-white/5 shadow-2xl overflow-hidden transition-all duration-300 hover:border-cyber-tertiary/25">
-            <ImplementationRoadmap report={report} />
-          </div>
+              {/* Bento Card 2: Implementation Roadmap */}
+              <div className="bg-[#0f1116] rounded-2xl border border-white/5 shadow-2xl overflow-hidden transition-all duration-300 hover:border-cyber-tertiary/25">
+                <ImplementationRoadmap report={report} />
+              </div>
 
-          {/* Bento Card 3: Strategic Bottlenecks / Issue Tracker */}
-          <div className="bg-[#0f1116] rounded-2xl border border-white/5 shadow-2xl overflow-hidden transition-all duration-300 hover:border-red-500/25">
-            <IssueTracker
-              report={report}
-              onUpdateIssueStatus={handleUpdateIssueStatus}
-              onAddCustomIssue={handleAddCustomIssue}
-            />
-          </div>
+              {/* Bento Card 3: Strategic Bottlenecks / Issue Tracker */}
+              <div className="bg-[#0f1116] rounded-2xl border border-white/5 shadow-2xl overflow-hidden transition-all duration-300 hover:border-red-500/25">
+                <IssueTracker
+                  report={report}
+                  onUpdateIssueStatus={handleUpdateIssueStatus}
+                  onAddCustomIssue={handleAddCustomIssue}
+                />
+              </div>
+            </>
+          )}
         </section>
       </main>
 

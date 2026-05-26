@@ -339,18 +339,25 @@ export const ConversationalWorkspace: React.FC<ConversationalWorkspaceProps> = (
 
         {/* Text Input Box */}
         <div className="relative flex-1">
+          {isListening && (
+            <div className="absolute inset-0 bg-cyber-[#1f222a]/50 rounded-xl pointer-events-none flex items-center px-4 overflow-hidden z-10 border border-red-500/30">
+               <div className="absolute top-0 left-0 bottom-0 bg-red-500/10 pointer-events-none animate-pulse w-full"></div>
+            </div>
+          )}
           <textarea
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={isListening ? "Listening feed active... Speak clearly." : "Type your business concept here..."}
-            className="w-full bg-cyber-surface border border-cyber-bright/50 text-cyber-text rounded-xl pl-4 pr-12 py-3.5 text-sm outline-none focus:border-cyber-primary transition-all resize-none h-12"
+            className={`w-full bg-cyber-surface border text-cyber-text rounded-xl pl-4 pr-12 py-3.5 text-sm outline-none transition-all resize-none h-12 relative z-20 ${
+              isListening ? "border-red-500/50 bg-transparent text-red-50" : "border-cyber-bright/50 focus:border-cyber-primary"
+            }`}
             disabled={isListening}
           />
           <button
             onClick={handleSend}
             disabled={!inputText.trim()}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-cyber-primary hover:shadow-[0_0_10px_rgba(2,224,24,0.4)] transition-all cursor-pointer text-black disabled:opacity-30 disabled:shadow-none"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-cyber-primary hover:shadow-[0_0_10px_rgba(0,255,157,0.4)] transition-all cursor-pointer text-black disabled:opacity-30 disabled:shadow-none z-30"
           >
             <Send className="w-4 h-4" />
           </button>
